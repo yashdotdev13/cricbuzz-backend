@@ -9,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import java.util.Iterator;
 
 @Service
 @RequiredArgsConstructor
@@ -20,48 +19,69 @@ public class IngestionService {
     private final MatchService matchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-
+    /**
+     * Scheduled ingestion every 15 seconds.
+     * Polls CricAPI for live matches and updates scores.
+     */
     @Scheduled(fixedRate = 15000)
     public void ingestLiveData() {
-        log.info("Starting ingestion cycle...");
+        log.info("🚀 Starting ingestion cycle...");
 
         try {
-            String jsonResponse = cricketApiClient.getLiveMatches();
+            String jsonResponse = cricketApiClient.getLiveScores();
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
-            JsonNode matches = rootNode.path("matches");
 
-            if (!matches.isArray()) {
-                log.warn("No matches found in response.");
+            JsonNode dataNode = rootNode.path("data");
+            if (!dataNode.isArray() || dataNode.isEmpty()) {
+                log.warn("⚠️ No live matches found in response.");
                 return;
             }
 
-            Iterator<JsonNode> iterator = matches.elements();
-            while (iterator.hasNext()) {
-                JsonNode matchNode = iterator.next();
+            for (JsonNode matchNode : dataNode) {
+                String matchId = matchNode.path("id").asText();
+                String name = matchNode.path("name").asText("Unknown Match");
+                String status = matchNode.path("status").asText("Unknown");
+                String team1 = matchNode.path("t1").asText();
+                String team2 = matchNode.path("t2").asText();
 
-                Long matchId = matchNode.path("id").asLong();
-                String status = matchNode.path("status").asText();
+                if (!status.equalsIgnoreCase("live")) continue;
 
-                if (!"Live".equalsIgnoreCase(status)) continue;
+                log.info("📊 Processing Live Match: {} ({}) - Status: {}", name, matchId, status);
 
-                // Map to ScoreSnapshotDto
-                ScoreSnapshotDto snapshot = new ScoreSnapshotDto();
-                snapshot.setId(matchId);
-                snapshot.setBattingTeam(matchNode.path("batting_team").asText());
-                snapshot.setRuns(matchNode.path("teamScore").asInt());
-                snapshot.setWickets(matchNode.path("wickets").asInt());
-                snapshot.setOvers(matchNode.path("overs").asDouble());
-                snapshot.setLastBall(matchNode.path("last_ball").asText("No commentary yet"));
+                // Parse Score Data
+                JsonNode team1ScoreNode = matchNode.path("t1s");
+                JsonNode team2ScoreNode = matchNode.path("t2s");
 
+                String team1Score = team1ScoreNode.asText("");
+                String team2Score = team2ScoreNode.asText("");
 
-                // Update match score
+                // Determine which team is batting based on non-empty score
+                String battingTeam = !team1Score.isEmpty() ? team1 : team2;
+                String scoreString = !team1Score.isEmpty() ? team1Score : team2Score;
+
+                // Extract numeric data
+                int runs = extractRuns(scoreString);
+                int wickets = extractWickets(scoreString);
+                double overs = extractOvers(scoreString);
+
+                // Map to DTO
+                ScoreSnapshotDto snapshot = ScoreSnapshotDto.builder()
+                        .id(Long.valueOf(matchId.hashCode())) // generate numeric ID
+                        .battingTeam(battingTeam)
+                        .runs(runs)
+                        .wickets(wickets)
+                        .overs(overs)
+                        .lastBall("Live update not available in free API")
+                        .build();
+
                 matchService.updateMatchScore(snapshot);
 
-                // Create sample commentary event
-                CommentaryEventDto commentary = new CommentaryEventDto();
-                commentary.setId(matchId);
-                commentary.setOver(String.valueOf(snapshot.getOvers()));
-                commentary.setText(matchNode.path("lastBall").asText("No commentary yet."));
+                // Commentary placeholder
+                CommentaryEventDto commentary = CommentaryEventDto.builder()
+                        .id(snapshot.getId())
+                        .over(String.valueOf(snapshot.getOvers()))
+                        .text(String.format("%s: %s/%s (%.1f ov)", battingTeam, runs, wickets, overs))
+                        .build();
 
                 matchService.addCommentaryEvent(commentary);
             }
@@ -69,7 +89,45 @@ public class IngestionService {
             log.info("✅ Ingestion cycle completed successfully.");
 
         } catch (Exception e) {
-            log.error("Error during ingestion cycle: {}", e.getMessage(), e);
+            log.error("❌ Error during ingestion cycle: {}", e.getMessage(), e);
+        }
+    }
+
+    // ---------- Helper Methods ---------- //
+
+    private int extractRuns(String scoreString) {
+        try {
+            String[] parts = scoreString.split("/");
+            return Integer.parseInt(parts[0].replaceAll("[^0-9]", ""));
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private int extractWickets(String scoreString) {
+        try {
+            String[] parts = scoreString.split("/");
+            if (parts.length > 1) {
+                String w = parts[1].split("\\(")[0].replaceAll("[^0-9]", "");
+                return Integer.parseInt(w);
+            }
+            return 0;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private double extractOvers(String scoreString) {
+        try {
+            int start = scoreString.indexOf('(');
+            int end = scoreString.indexOf(')');
+            if (start != -1 && end != -1) {
+                String oversPart = scoreString.substring(start + 1, end).replace("ov", "").trim();
+                return Double.parseDouble(oversPart);
+            }
+            return 0.0;
+        } catch (Exception e) {
+            return 0.0;
         }
     }
 }
