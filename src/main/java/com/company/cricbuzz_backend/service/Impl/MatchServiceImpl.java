@@ -11,6 +11,7 @@ import com.company.cricbuzz_backend.entity.Team;
 import com.company.cricbuzz_backend.exceptions.ResourceNotFoundException;
 import com.company.cricbuzz_backend.repository.*;
 import com.company.cricbuzz_backend.service.MatchService;
+import com.company.cricbuzz_backend.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -29,7 +30,7 @@ public class MatchServiceImpl implements MatchService {
     private final CommentaryEventRepository commentaryEventRepository;
     private final TeamRepository teamRepository;
     private final PlayerRepository playerRepository;
-
+    private final WebSocketService webSocketService;
     private final ModelMapper modelMapper;
     private final RedisTemplate<String, Object> redisTemplate;
 
@@ -111,52 +112,37 @@ public class MatchServiceImpl implements MatchService {
     @Override
     public void updateMatchScore(ScoreSnapshotDto scoreSnapshotDto) {
         log.info("Updating match score: {}", scoreSnapshotDto);
-        try {
-            Match match = matchRepository.findById(scoreSnapshotDto.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + scoreSnapshotDto.getId()));
+        Match match = matchRepository.findById(scoreSnapshotDto.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + scoreSnapshotDto.getId()));
 
-            ScoreSnapshot snapshot = modelMapper.map(scoreSnapshotDto, ScoreSnapshot.class);
-            snapshot.setMatch(match);
+        ScoreSnapshot snapshot = modelMapper.map(scoreSnapshotDto, ScoreSnapshot.class);
+        snapshot.setMatch(match);
 
-            scoreSnapshotRepository.save(snapshot);
+        scoreSnapshotRepository.save(snapshot);
 
-            // ---------------- Redis Cache ----------------
-            String redisKey = "match:" + match.getId();
-            redisTemplate.opsForValue().set(redisKey, snapshot);
-
-            // ---------------- WebSocket Broadcast ----------------
-            // TODO: Inject WebSocketService and broadcast snapshot
-
-        } catch (Exception e) {
-            log.error("Error updating match score: {}", e.getMessage());
-            throw new ResourceNotFoundException("Failed to update score for match ID: " + scoreSnapshotDto.getId());
-        }
+        // ---------------- Redis Cache ----------------
+        String redisKey = "match:" + match.getId();
+        redisTemplate.opsForValue().set(redisKey, snapshot);
+        webSocketService.broadcastScore(scoreSnapshotDto);
     }
 
 
     @Override
     public void addCommentaryEvent(CommentaryEventDto commentaryEventDto) {
         log.info("Adding commentary event: {}", commentaryEventDto);
-        try {
-            Match match = matchRepository.findById(commentaryEventDto.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + commentaryEventDto.getId()));
+        Match match = matchRepository.findById(commentaryEventDto.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + commentaryEventDto.getId()));
 
-            CommentaryEvent event = modelMapper.map(commentaryEventDto, CommentaryEvent.class);
-            event.setMatch(match);
+        CommentaryEvent event = modelMapper.map(commentaryEventDto, CommentaryEvent.class);
+        event.setMatch(match);
 
-            commentaryEventRepository.save(event);
+        commentaryEventRepository.save(event);
 
-            // ---------------- Redis Cache ----------------
-            String redisKey = "commentary:" + match.getId();
-            // For simplicity, can store a List<CommentaryEvent> in Redis
-            // TODO: implement adding event to cached list
+        // ---------------- Redis Cache ----------------
+        String redisKey = "commentary:" + match.getId();
+        redisTemplate.opsForList().rightPush(redisKey, event); // store list of events
 
-            // ---------------- WebSocket Broadcast ----------------
-            // TODO: Inject WebSocketService and broadcast commentary
-
-        } catch (Exception e) {
-            log.error("Error adding commentary event: {}", e.getMessage());
-            throw new ResourceNotFoundException("Failed to add commentary for match ID: " + commentaryEventDto.getId());
-        }
+        // ---------------- WebSocket Broadcast ----------------
+        webSocketService.broadcastCommentary(commentaryEventDto);
     }
 }
