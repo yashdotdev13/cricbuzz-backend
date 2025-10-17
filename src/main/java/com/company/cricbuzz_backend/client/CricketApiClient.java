@@ -51,4 +51,18 @@ public class CricketApiClient {
             throw new RuntimeException("Failed to fetch match details from CricAPI", e);
         }
     }
+
+
+    public String getMatchScore(String matchId) {
+        String url = String.format("%s/match_info?apikey=%s&id=%s", baseUrl, apiKey, matchId);
+        log.info("Fetching score details for match ID: {}", matchId);
+        return restTemplate.getForObject(url, String.class);
+    }
+
+    public String getCommentary(String matchId) {
+        String url = String.format("%s/match_commentary?apikey=%s&id=%s", baseUrl, apiKey, matchId);
+        log.info("Fetching commentary for match ID: {}", matchId);
+        return restTemplate.getForObject(url, String.class);
+    }
+
 } 
