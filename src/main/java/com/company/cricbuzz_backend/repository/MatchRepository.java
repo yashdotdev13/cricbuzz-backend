@@ -13,4 +13,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByTeam1OrTeam2(Team team1, Team team2);
 
     Optional<Match> findByStatus(String status);
+
+
+    Optional<Match> findByTitleAndTeam1AndTeam2(String title, Team team1, Team team2);
+
 }
