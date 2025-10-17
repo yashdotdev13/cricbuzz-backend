@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
-
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.retry.annotation.Retryable;
@@ -38,18 +37,29 @@ public class IngestionService {
     private final MatchServiceImpl matchService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Poll every 15 seconds (adjust as needed).
+     * Synchronized to avoid overlapping scheduled runs.
+     */
     @Scheduled(fixedRate = 1500000)
     @Synchronized
-    @Retryable(
-            value = { Exception.class },
-            maxAttempts = 3,
-            backoff = @Backoff(delay = 2000)
-    )
     public void ingestLiveData() {
         log.info("🚀 Starting ingestion cycle...");
         try {
             String jsonResponse = cricketApiClient.getLiveScores();
+            if (jsonResponse == null || jsonResponse.isBlank()) {
+                log.warn("Empty response from CricAPI");
+                return;
+            }
+
             JsonNode rootNode = objectMapper.readTree(jsonResponse);
+
+            // Check for API failure (e.g., quota exceeded)
+            if (rootNode.has("status") && "failure".equalsIgnoreCase(rootNode.path("status").asText())) {
+                log.warn("CricAPI returned failure: {}", rootNode.path("reason").asText());
+                return;
+            }
+
             JsonNode dataNode = rootNode.path("data");
 
             if (!dataNode.isArray() || dataNode.isEmpty()) {
@@ -58,7 +68,14 @@ public class IngestionService {
             }
 
             for (JsonNode matchNode : dataNode) {
-                processMatchNode(matchNode);
+                try {
+                    processMatchNode(matchNode);
+                } catch (OptimisticLockingFailureException ole) {
+                    // already handled by @Retryable on processMatchNode — but catch here to avoid breaking loop
+                    log.warn("Optimistic lock while processing a match, continuing to next. {}", ole.getMessage());
+                } catch (Exception e) {
+                    log.error("Error processing match node: {}", e.getMessage(), e);
+                }
             }
 
             log.info("✅ Ingestion cycle completed successfully.");
@@ -68,39 +85,55 @@ public class IngestionService {
         }
     }
 
+    /**
+     * Process a single match JSON node.
+     * Uses externalId (string from provider) to find or create a managed Match entity,
+     * updates the managed entity fields, then saveAndFlush() to persist immediately.
+     *
+     * Retries on optimistic locking conflicts.
+     */
     @Retryable(
             value = {OptimisticLockingFailureException.class},
             maxAttempts = 3,
-            backoff = @Backoff(delay = 200)
+            backoff = @Backoff(delay = 300)
     )
     @Transactional
     public void processMatchNode(JsonNode matchNode) {
-        String matchIdStr = matchNode.path("id").asText();
-        Long matchId = (long) matchIdStr.hashCode(); // numeric ID
+        String externalId = matchNode.path("id").asText(); // provider string id
         String title = matchNode.path("name").asText("Unknown Match");
         String team1Name = matchNode.path("t1").asText("Team 1");
         String team2Name = matchNode.path("t2").asText("Team 2");
         String status = matchNode.path("status").asText("Scheduled");
         LocalDateTime startTime = LocalDateTime.now();
 
-        // --- Create or fetch Teams ---
+        // --- Create or fetch Teams (managed entities) ---
         Team team1 = teamRepository.findByName(team1Name)
-                .orElseGet(() -> teamRepository.save(Team.builder().name(team1Name).build()));
+                .orElseGet(() -> teamRepository.saveAndFlush(Team.builder().name(team1Name).build()));
         Team team2 = teamRepository.findByName(team2Name)
-                .orElseGet(() -> teamRepository.save(Team.builder().name(team2Name).build()));
+                .orElseGet(() -> teamRepository.saveAndFlush(Team.builder().name(team2Name).build()));
 
-        // --- Create or update Match ---
-        Match match = matchRepository.findById(matchId)
-                .orElse(Match.builder().id(matchId).build());
+        // --- Fetch managed Match by externalId OR create new (managed) ---
+        Match match = matchRepository.findByExternalId(externalId)
+                .orElseGet(() -> {
+                    Match m = new Match();
+                    m.setExternalId(externalId);
+                    m.setTitle(title);
+                    m.setTeam1(team1);
+                    m.setTeam2(team2);
+                    m.setStatus(status);
+                    m.setStartTime(startTime);
+                    return matchRepository.saveAndFlush(m); // returns managed entity with generated id
+                });
 
+        // If it existed, update fields on the managed entity
         match.setTitle(title);
         match.setTeam1(team1);
         match.setTeam2(team2);
         match.setStatus(status);
         match.setStartTime(startTime);
 
-        // Save match with optimistic locking handling
-        matchRepository.save(match);
+        // Persist changes immediately
+        matchRepository.saveAndFlush(match);
 
         // --- Score Parsing if available ---
         String team1Score = matchNode.path("t1s").asText("");
