@@ -68,9 +68,6 @@ public class ScoreCommentaryIngestionService {
         }
     }
 
-    /**
-     * Fetches and stores the latest score snapshot for a match.
-     */
     private void fetchAndSaveScore(Match match) throws Exception {
 
         String scoreJson =

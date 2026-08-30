@@ -44,7 +44,7 @@ public class IngestionService {
     @Scheduled(fixedRate = 1500000)
     @Synchronized
     public void ingestLiveData() {
-        log.info("🚀 Starting ingestion cycle...");
+        log.info(" Starting ingestion cycle...");
         try {
             String jsonResponse = cricketApiClient.getLiveScores();
             if (jsonResponse == null || jsonResponse.isBlank()) {
@@ -63,7 +63,7 @@ public class IngestionService {
             JsonNode dataNode = rootNode.path("data");
 
             if (!dataNode.isArray() || dataNode.isEmpty()) {
-                log.warn("⚠️ No matches found in API response.");
+                log.warn(" No matches found in API response.");
                 return;
             }
 
@@ -78,10 +78,10 @@ public class IngestionService {
                 }
             }
 
-            log.info("✅ Ingestion cycle completed successfully.");
+            log.info(" Ingestion cycle completed successfully.");
 
         } catch (Exception e) {
-            log.error("❌ Error during ingestion cycle: {}", e.getMessage(), e);
+            log.error(" Error during ingestion cycle: {}", e.getMessage(), e);
         }
     }
 

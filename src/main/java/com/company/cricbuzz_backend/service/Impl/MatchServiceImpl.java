@@ -35,8 +35,6 @@ public class MatchServiceImpl implements MatchService {
     private final ModelMapper modelMapper;
     private final RedisTemplate<String, Object> redisTemplate;
 
-    // ======== Match methods    ======== //
-
     @Override
     public MatchDto getMatchById(Long matchId) {
         log.info("Fetching match by ID: {}", matchId);
@@ -75,8 +73,6 @@ public class MatchServiceImpl implements MatchService {
                 .collect(Collectors.toList());
     }
 
-
-    //  ========= score methods  ======== //
     @Override
     public ScoreSnapshotDto getLatestScore(Long matchId) {
         log.info("Fetching latest score for match ID: {}", matchId);

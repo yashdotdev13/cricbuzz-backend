@@ -18,7 +18,6 @@ public class Match {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // External ID from CricAPI (stable string id) - use this to find matches
     @Column(name = "external_id", unique = true, nullable = true)
     private String externalId;
 
@@ -38,7 +37,6 @@ public class Match {
 
     private String status; // Scheduled, Live, Completed
 
-    // optimistic locking version field
     @Version
     private Long version;
 }

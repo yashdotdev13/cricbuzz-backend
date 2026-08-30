@@ -19,8 +19,6 @@ public class MatchController {
 
     private final MatchService matchService;
 
-    // ---------------- Match Endpoints ---------------- //
-
     @GetMapping
     public ResponseEntity<List<MatchDto>> getAllMatches() {
         log.info("Fetching all matches");
@@ -49,8 +47,6 @@ public class MatchController {
         return ResponseEntity.ok(match);
     }
 
-    // ---------------- Score Endpoints ---------------- //
-
     @GetMapping("/{matchId}/score")
     public ResponseEntity<ScoreSnapshotDto> getLatestScore(@PathVariable Long matchId) {
         log.info("Fetching latest score for match ID: {}", matchId);
@@ -65,8 +61,6 @@ public class MatchController {
         return ResponseEntity.ok(history);
     }
 
-    // ---------------- Commentary Endpoints ---------------- //
-
     @GetMapping("/{matchId}/commentary")
     public ResponseEntity<List<CommentaryEventDto>> getCommentaryByMatch(@PathVariable Long matchId) {
         log.info("Fetching commentary for match ID: {}", matchId);
@@ -74,7 +68,6 @@ public class MatchController {
         return ResponseEntity.ok(commentaryList);
     }
 
-    // These are optional if you want to allow manual updates via API
     @PostMapping("/{matchId}/score")
     public ResponseEntity<Void> updateMatchScore(
             @PathVariable Long matchId,
