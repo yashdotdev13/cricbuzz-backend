@@ -42,7 +42,7 @@ public class MatchServiceImpl implements MatchService {
         log.info("Fetching match by ID: {}", matchId);
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(()->new ResourceNotFoundException("match not found not found with id:"+matchId));
-        return modelMapper.map(match, MatchDto.class);
+        return mapToMatchDto(match);
     }
 
     @Override
@@ -50,16 +50,17 @@ public class MatchServiceImpl implements MatchService {
         log.info("Fetching all the matches");
         return matchRepository.findAll()
                 .stream()
-                .map(match-> modelMapper.map(match, MatchDto.class))
+                .map(this::mapToMatchDto)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<MatchDto> getLiveMatches() {
         log.info("Fetching live matches");
-        return matchRepository.findByStatus("Live")
+
+        return matchRepository.findByStatus("LIVE")
                 .stream()
-                .map(match -> modelMapper.map(match, MatchDto.class))
+                .map(this::mapToMatchDto)
                 .collect(Collectors.toList());
     }
 
@@ -70,7 +71,7 @@ public class MatchServiceImpl implements MatchService {
                 .orElseThrow(()->new RuntimeException("Team not found: "+teamName));
         return matchRepository.findByTeam1OrTeam2(team, team)
                 .stream()
-                .map(match-> modelMapper.map(match, MatchDto.class))
+                .map(this::mapToMatchDto)
                 .collect(Collectors.toList());
     }
 
@@ -152,12 +153,24 @@ public class MatchServiceImpl implements MatchService {
         event.setMatch(match);
 
         event.setEventTime(LocalDateTime.now());
-
         commentaryEventRepository.save(event);
 
         String redisKey = "commentary:" + matchId;
         redisTemplate.opsForList().rightPush(redisKey, event);
 
         webSocketService.broadcastCommentary(matchId, commentaryEventDto);
+    }
+
+
+    private MatchDto mapToMatchDto(Match match) {
+        return MatchDto.builder()
+                .id(match.getId())
+                .title(match.getTitle())
+                .team1(match.getTeam1() != null ? match.getTeam1().getName() : null)
+                .team2(match.getTeam2() != null ? match.getTeam2().getName() : null)
+                .venue(match.getVenue())
+                .startTime(match.getStartTime())
+                .status(match.getStatus())
+                .build();
     }
 }

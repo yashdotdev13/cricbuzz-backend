@@ -100,10 +100,12 @@ public class IngestionService {
     @Transactional
     public void processMatchNode(JsonNode matchNode) {
         String externalId = matchNode.path("id").asText(); // provider string id
-        String title = matchNode.path("name").asText("Unknown Match");
         String team1Name = matchNode.path("t1").asText("Team 1");
         String team2Name = matchNode.path("t2").asText("Team 2");
-        String status = matchNode.path("status").asText("Scheduled");
+
+        String title = team1Name + " vs " + team2Name;
+
+        String status = normalizeStatus(matchNode);
         LocalDateTime startTime = LocalDateTime.now();
 
         // --- Create or fetch Teams (managed entities) ---
@@ -165,6 +167,43 @@ public class IngestionService {
 
             matchService.addCommentaryEvent(match.getId(), commentary);
         }
+    }
+    private String normalizeStatus(JsonNode matchNode) {
+
+        // CricAPI provides these flags for many match responses
+        boolean matchStarted = matchNode.path("matchStarted").asBoolean(false);
+        boolean matchEnded = matchNode.path("matchEnded").asBoolean(false);
+
+        if (matchEnded) {
+            return "COMPLETED";
+        }
+
+        if (matchStarted) {
+            return "LIVE";
+        }
+
+        // Fallback based on textual status
+        String rawStatus = matchNode.path("status")
+                .asText("")
+                .toLowerCase();
+
+        if (rawStatus.contains("won")
+                || rawStatus.contains("draw")
+                || rawStatus.contains("abandoned")
+                || rawStatus.contains("cancelled")
+                || rawStatus.contains("completed")) {
+
+            return "COMPLETED";
+        }
+
+        if (rawStatus.contains("live")
+                || rawStatus.contains("in progress")
+                || rawStatus.contains("innings")) {
+
+            return "LIVE";
+        }
+
+        return "SCHEDULED";
     }
 
     // ---------- Helper Methods ----------
