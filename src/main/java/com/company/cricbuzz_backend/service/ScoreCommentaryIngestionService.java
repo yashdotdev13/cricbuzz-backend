@@ -46,7 +46,7 @@ public class ScoreCommentaryIngestionService {
                     snapshot.setWickets(data.path("wickets").asInt(0));
                     snapshot.setSnapshotTime(LocalDateTime.now());
                     scoreSnapshotRepository.save(snapshot);
-                    log.info("✅ Saved score snapshot for match: {}", match.getTitle());
+                    log.info("Saved score snapshot for match: {}", match.getTitle());
                 }
 
                 // ---- Fetch Commentary ----
@@ -60,10 +60,10 @@ public class ScoreCommentaryIngestionService {
                         event.setEventTime(LocalDateTime.now());
                         commentaryEventRepository.save(event);
                     }
-                    log.info("✅ Saved commentary for match: {}", match.getTitle());
+                    log.info("Saved commentary for match: {}", match.getTitle());
                 }
             } catch (Exception e) {
-                log.error("❌ Failed to update score/commentary for match {}: {}", match.getTitle(), e.getMessage());
+                log.error("Failed to update score/commentary for match {}: {}", match.getTitle(), e.getMessage());
             }
         }
     }

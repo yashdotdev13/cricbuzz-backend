@@ -14,23 +14,53 @@ public class WebSocketService {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    public void broadcastScore(ScoreSnapshotDto scoreSnapshotDto) {
+    public void broadcastScore(
+            Long matchId,
+            ScoreSnapshotDto scoreSnapshotDto) {
+
         try {
-            String destination = "/topic/match/" + scoreSnapshotDto.getId() + "/score";
+            String destination =
+                    "/topic/match/" + matchId + "/score";
+
             log.info("Broadcasting score update to {}", destination);
-            messagingTemplate.convertAndSend(destination, scoreSnapshotDto);
-        } catch (Exception e) {
-            log.error("Error broadcasting score: {}", e.getMessage());
+
+            messagingTemplate.convertAndSend(
+                    destination,
+                    scoreSnapshotDto
+            );
+        }
+        catch (Exception e) {
+            log.error(
+                    "Error broadcasting score for match {}: {}",
+                    matchId,
+                    e.getMessage(),
+                    e
+            );
         }
     }
 
-    public void broadcastCommentary(CommentaryEventDto commentaryEventDto) {
+    public void broadcastCommentary(
+            Long matchId,
+            CommentaryEventDto commentaryEventDto) {
+
         try {
-            String destination = "/topic/match/" + commentaryEventDto.getId() + "/commentary";
-            log.info("Broadcasting commentary to {}", destination);
-            messagingTemplate.convertAndSend(destination, commentaryEventDto);
-        } catch (Exception e) {
-            log.error("Error broadcasting commentary: {}", e.getMessage());
+            String destination =
+                    "/topic/match/" + matchId + "/commentary";
+
+            log.info("Broadcasting commentary update to {}", destination);
+
+            messagingTemplate.convertAndSend(
+                    destination,
+                    commentaryEventDto
+            );
+        }
+        catch (Exception e) {
+            log.error(
+                    "Error broadcasting commentary for match {}: {}",
+                    matchId,
+                    e.getMessage(),
+                    e
+            );
         }
     }
 }

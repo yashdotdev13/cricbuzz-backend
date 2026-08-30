@@ -74,23 +74,24 @@ public class MatchController {
         return ResponseEntity.ok(commentaryList);
     }
 
-    // ---------------- Admin / Update Endpoints ---------------- //
     // These are optional if you want to allow manual updates via API
     @PostMapping("/{matchId}/score")
-    public ResponseEntity<Void> updateMatchScore(@PathVariable Long matchId,
-                                                 @RequestBody ScoreSnapshotDto scoreSnapshotDto) {
+    public ResponseEntity<Void> updateMatchScore(
+            @PathVariable Long matchId,
+            @RequestBody ScoreSnapshotDto scoreSnapshotDto) {
+
         log.info("Updating match score for match ID: {}", matchId);
-        scoreSnapshotDto.setId(matchId);
-        matchService.updateMatchScore(scoreSnapshotDto);
+        matchService.updateMatchScore(matchId, scoreSnapshotDto);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/{matchId}/commentary")
-    public ResponseEntity<Void> addCommentaryEvent(@PathVariable Long matchId,
-                                                   @RequestBody CommentaryEventDto commentaryEventDto) {
+    public ResponseEntity<Void> addCommentaryEvent(
+            @PathVariable Long matchId,
+            @RequestBody CommentaryEventDto commentaryEventDto) {
+
         log.info("Adding commentary for match ID: {}", matchId);
-        commentaryEventDto.setId(matchId);
-        matchService.addCommentaryEvent(commentaryEventDto);
+        matchService.addCommentaryEvent(matchId, commentaryEventDto);
         return ResponseEntity.ok().build();
     }
 }

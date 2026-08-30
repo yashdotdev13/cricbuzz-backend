@@ -29,7 +29,7 @@ public class ScoreSnapshot {
     private int runs;
     private int wickets;
 
-    private double score;
+    private double overs;
 
     private String lastBall;
 

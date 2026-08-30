@@ -155,7 +155,7 @@ public class IngestionService {
                     .lastBall("Live update not available in free API")
                     .build();
 
-            matchService.updateMatchScore(snapshotDto);
+            matchService.updateMatchScore(match.getId(), snapshotDto);
 
             CommentaryEventDto commentary = CommentaryEventDto.builder()
                     .id(match.getId())
@@ -163,7 +163,7 @@ public class IngestionService {
                     .text(String.format("%s: %s/%s (%.1f ov)", battingTeamName, runs, wickets, overs))
                     .build();
 
-            matchService.addCommentaryEvent(commentary);
+            matchService.addCommentaryEvent(match.getId(), commentary);
         }
     }
 

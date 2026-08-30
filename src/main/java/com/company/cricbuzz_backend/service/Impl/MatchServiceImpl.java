@@ -17,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,7 +31,6 @@ public class MatchServiceImpl implements MatchService {
     private final ScoreSnapshotRepository scoreSnapshotRepository;
     private final CommentaryEventRepository commentaryEventRepository;
     private final TeamRepository teamRepository;
-    private final PlayerRepository playerRepository;
     private final WebSocketService webSocketService;
     private final ModelMapper modelMapper;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -110,39 +111,53 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
-    public void updateMatchScore(ScoreSnapshotDto scoreSnapshotDto) {
-        log.info("Updating match score: {}", scoreSnapshotDto);
-        Match match = matchRepository.findById(scoreSnapshotDto.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + scoreSnapshotDto.getId()));
+    public void updateMatchScore(Long matchId, ScoreSnapshotDto scoreSnapshotDto) {
+        log.info("Updating match score for match ID: {}", matchId);
+
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Match not found with ID: " + matchId));
 
         ScoreSnapshot snapshot = modelMapper.map(scoreSnapshotDto, ScoreSnapshot.class);
+
+        snapshot.setId(null);
         snapshot.setMatch(match);
+
+        snapshot.setSnapshotTime(LocalDateTime.now());
 
         scoreSnapshotRepository.save(snapshot);
 
-        // ---------------- Redis Cache ----------------
-        String redisKey = "match:" + match.getId();
+        String redisKey = "match:" + matchId;
         redisTemplate.opsForValue().set(redisKey, snapshot);
-        webSocketService.broadcastScore(scoreSnapshotDto);
+
+        webSocketService.broadcastScore(matchId, scoreSnapshotDto);
     }
 
 
     @Override
-    public void addCommentaryEvent(CommentaryEventDto commentaryEventDto) {
-        log.info("Adding commentary event: {}", commentaryEventDto);
-        Match match = matchRepository.findById(commentaryEventDto.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Match not found with ID: " + commentaryEventDto.getId()));
+    public void addCommentaryEvent(
+            Long matchId,
+            CommentaryEventDto commentaryEventDto) {
 
-        CommentaryEvent event = modelMapper.map(commentaryEventDto, CommentaryEvent.class);
+        log.info("Adding commentary event for match ID: {}", matchId);
+
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Match not found with ID: " + matchId));
+
+        CommentaryEvent event =
+                modelMapper.map(commentaryEventDto, CommentaryEvent.class);
+
+        event.setId(null);
         event.setMatch(match);
+
+        event.setEventTime(LocalDateTime.now());
 
         commentaryEventRepository.save(event);
 
-        // ---------------- Redis Cache ----------------
-        String redisKey = "commentary:" + match.getId();
-        redisTemplate.opsForList().rightPush(redisKey, event); // store list of events
+        String redisKey = "commentary:" + matchId;
+        redisTemplate.opsForList().rightPush(redisKey, event);
 
-        // ---------------- WebSocket Broadcast ----------------
-        webSocketService.broadcastCommentary(commentaryEventDto);
+        webSocketService.broadcastCommentary(matchId, commentaryEventDto);
     }
 }

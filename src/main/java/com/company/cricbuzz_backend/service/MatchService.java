@@ -25,6 +25,7 @@ public interface MatchService {
     List<CommentaryEventDto> getCommentaryByMatch(Long matchId);
 
     // updated
-    void updateMatchScore(ScoreSnapshotDto scoreSnapshotDto);
-    void addCommentaryEvent(CommentaryEventDto commentaryEventDto);
+    void updateMatchScore(Long matchId, ScoreSnapshotDto scoreSnapshotDto);
+
+    void addCommentaryEvent(Long matchId, CommentaryEventDto commentaryEventDto);
 }
