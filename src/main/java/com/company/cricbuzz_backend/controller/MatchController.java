@@ -4,6 +4,7 @@ import com.company.cricbuzz_backend.dtos.CommentaryEventDto;
 import com.company.cricbuzz_backend.dtos.MatchDto;
 import com.company.cricbuzz_backend.dtos.ScoreSnapshotDto;
 import com.company.cricbuzz_backend.service.MatchService;
+import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,11 @@ public class MatchController {
 
     private final MatchService matchService;
 
+
+    @Operation(
+            summary = "Get all matches",
+            description = "Returns all cricket matches available in the system"
+    )
     @GetMapping
     public ResponseEntity<List<MatchDto>> getAllMatches() {
         log.info("Fetching all matches");
@@ -26,6 +32,10 @@ public class MatchController {
         return ResponseEntity.ok(matches);
     }
 
+    @Operation(
+            summary = "Get all live matches",
+            description = "Returns all live cricket matches available in the system"
+    )
     @GetMapping("/live")
     public ResponseEntity<List<MatchDto>> getLiveMatches() {
         log.info("Fetching live matches");
@@ -40,6 +50,10 @@ public class MatchController {
         return ResponseEntity.ok(matches);
     }
 
+    @Operation(
+            summary = "Get match by ID",
+            description = "Returns details of a specific match"
+    )
     @GetMapping("/{matchId}")
     public ResponseEntity<MatchDto> getMatchById(@PathVariable Long matchId) {
         log.info("Fetching match by ID: {}", matchId);
@@ -47,6 +61,11 @@ public class MatchController {
         return ResponseEntity.ok(match);
     }
 
+
+    @Operation(
+            summary = "Get lastest score of the match",
+            description = "Returns details of latest score of  match"
+    )
     @GetMapping("/{matchId}/score")
     public ResponseEntity<ScoreSnapshotDto> getLatestScore(@PathVariable Long matchId) {
         log.info("Fetching latest score for match ID: {}", matchId);
