@@ -205,8 +205,6 @@ public class IngestionService {
 
         return "SCHEDULED";
     }
-
-    // ---------- Helper Methods ----------
     private int extractRuns(String scoreString) {
         try {
             String[] parts = scoreString.split("/");
